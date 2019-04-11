@@ -38,3 +38,17 @@ class MongoAgent():
         res = collection.find_one({'_id': Id})
         return res
 
+    def list_collections(self):
+        names = self.db.list_collection_names()
+        print(names)
+        return names
+
+
+if __name__ == '__main__':
+
+    mongoAgent = MongoAgent()
+    mongoAgent.list_collections()
+
+    sample = mongoAgent.load_by_id(5, 'train_data')
+
+    print('exit')
