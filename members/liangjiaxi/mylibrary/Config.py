@@ -19,7 +19,7 @@ class Config(object):
         merge_name_punctuation,
         merge_adjoint_postag,
         merge_quotation_marks,
-        replace_some_nourns
+   
     ])
     post_pipeline = Pipeline(
         [

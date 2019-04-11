@@ -53,13 +53,16 @@ class Bert_51_Model(Model):
         # 如果tensor1是J×1×N×M张量和tensor2是K×M×P张量，将一个J×K×N×P张量。
         
         #损失函数的选择？
+        # self.loss = F.poisson_nll_loss
         self.loss = F.poisson_nll_loss
         
         self.metric = Modified_F1()
+        
+    
         self.softmax = torch.nn.Softmax(dim=-1)
     
     def forward(self, words_poses_field: Dict[str, torch.Tensor],
-                reserved_pos_field: np.array,
+                # reserved_pos_field: np.array,
                 ner_labels: np.array = None):
         # 没有了encoder，mask也没啥用了
         # words_poses_mask = get_text_field_mask(words_poses_field)
@@ -96,6 +99,8 @@ class Bert_51_Model(Model):
             self.metric(attention, ner_labels)
             
             output["loss"] = self.loss(attention, ner_labels)
+
+            # print(torch.argmax(attention, dim=-1))
         
         return output
     

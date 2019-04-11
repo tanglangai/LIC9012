@@ -96,21 +96,59 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
     """
     n = len(words)
     temp_tensor = torch.zeros((n, n, 51))
-    for spo in spo_list:
-        assert isinstance(spo, dict)
-        
-        for i, obj in enumerate(words):
-            for j, sub in enumerate(words):
-                # 不是同一个词时
-                if i != j:
-                    height = match_(obj, sub, spo, label_scheme_dict)
-                    if height is not None:
-                        temp_tensor[i, j, height] = 1
+
+    for i, obj in enumerate(words):
+        for j, sub in enumerate(words):
+            
+            for spo in spo_list:
+                
+                assert isinstance(spo, dict)
     
+                height = match_(obj, sub, spo, label_scheme_dict)
+                if height is not None:
+
+                    temp_tensor[i, j, height] = 1
+                # 之前的一个重大的bug！！！！！！！！！！！！！！
+                # 我们至少要有一个1 ，如果没有匹配的话，就将第 0 位置置为 1
+            if temp_tensor[i, j, :].sum().item() == 0:
+                temp_tensor[i,j,0] = 1
+                    
     # return temp_tensor.cpu().numpy().tolist()
     #之前将数据放入了cpu中
     #CPU和GPU之间互换数据是一件十分浪费时间的事情。
     #尝试直接返回tensor的形式。
+    
+    #{"postag": [{"word": "丝角蝗科", "pos": "nz"}, {"word": "，", "pos": "w"}, {"word": "Oedipodidae", "pos": "nz"}, {"word": "，", "pos": "w"},
+    # {"word": "昆虫纲直翅目蝗总科", "pos": "nz"}, {"word": "的", "pos": "u"}, {"word": "一个科", "pos": "n"}],
+    # "text": "丝角蝗科，Oedipodidae，昆虫纲直翅目蝗总科的一个科",
+    # "spo_list": [{"predicate": "目", "object_type": "目", "subject_type": "生物", "object": "直翅目", "subject": "丝角蝗科"}]}
+    
+    "会有问题，如上那一条，因为错误分词的结果"
+    # if temp_tensor[:,:,0].sum() == n*n:
+    #     print("ALERT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    #     print("起码有一个标注了的吧，我之前是因为预处理在这个函数之前调用了，导致“周星驰”不会出现在“NAME”之中")
+        
+        
+    #按理说，每一对词，51列中有且只能有一个1，因此这条语句永远是真的
+    #若不通过，说明一对词被标注成了多个scheme，检查！
+    
+    
+    
+    if  temp_tensor.sum().item() != n * n:
+        m = temp_tensor.shape[0]
+        for i in range(m):
+            for j in range(m):
+                a = temp_tensor[i, j]
+                if a.sum().item() >1:
+                    print(i,j)
+                    print(words[i])
+                    print(words[j])
+                    print(words)
+                    print(a)
+                    assert False
+        print("temp_tensor.sum() is {}",format(temp_tensor.sum()))
+        print("n * n is {}".format(n * n))
+        raise Exception("一对词被标注成了多个scheme？")
     return temp_tensor
     
 

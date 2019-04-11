@@ -56,10 +56,10 @@ class Bert51_DataReader(DatasetReader):
                 continue
             #得到列表形式的数据
             words, poses = postag2wordpos(postag)
-            #调用预处理的pipeline
-            words, poses, position_dict = Config.pre_pipeline.run(words, poses)
+
+            # 调用预处理的pipeline
+            words, poses = Config.pre_pipeline.run(words, poses)
             assert len(words) == len(poses)
-            
             #转换标签
             if 'spo_list' in jsondata:
                 spo_list = jsondata['spo_list']
@@ -68,6 +68,10 @@ class Bert51_DataReader(DatasetReader):
             else:
                 labels_tensor = None
                 
+            #必须得拆开来写，
+            #merge一些东西   --->   convert_spolist2tensor   --->   replace_some_nourns将一些名词替换成其他的
+            from common_utils.preprocess_merge_something import replace_some_nourns
+            words, poses, position_dict = replace_some_nourns(words, poses)
             # 注意这里转换成了Token
             words_poses_tokens = []
             # 注意新添了一个列表,表示是不是名词啊之类的
@@ -85,14 +89,15 @@ class Bert51_DataReader(DatasetReader):
                 tmp_token = Token(word, tag_=pos)
                 words_poses_tokens.append(tmp_token)
 
-            yield self.text_to_instance(words_poses_tokens, reserved_pos, labels_tensor)
+            # yield self.text_to_instance(words_poses_tokens, reserved_pos, labels_tensor)
+            yield self.text_to_instance(words_poses_tokens, labels_tensor)
         
     def text_to_instance(self, words_poses_tokens: List[Token],
-                         reserved_pos: List[int],
+                         # reserved_pos: List[int],
                          labels_tensor: torch.Tensor = None) -> Instance:
         
         words_poses_field = TextField(words_poses_tokens, self.token_indexers)
-        reserved_pos_field = ArrayField(np.array(reserved_pos))
+        # reserved_pos_field = ArrayField(np.array(reserved_pos))
         
         # ner_field = SequenceLabelField(labels=ner_labels, sequence_field=words_poses_field)
         if labels_tensor is not None:
@@ -106,7 +111,7 @@ class Bert51_DataReader(DatasetReader):
         # ner_field=MetadataField(ner_labels)
         
         fields = {'words_poses_field': words_poses_field,
-                  "reserved_pos_field": reserved_pos_field,
+                  # "reserved_pos_field": reserved_pos_field,
                   "ner_labels": ner_field}
         
         return Instance(fields)

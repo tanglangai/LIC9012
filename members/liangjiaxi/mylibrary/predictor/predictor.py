@@ -44,7 +44,8 @@ class ner51_predictor(Predictor):
             tmp_token = Token(word,tag_ = pos)
             words_poses_tokens.append(tmp_token)
             
-        instance = self._dataset_reader.text_to_instance(words_poses_tokens, reserved_pos, None)
+        # instance = self._dataset_reader.text_to_instance(words_poses_tokens, reserved_pos, None)
+        instance = self._dataset_reader.text_to_instance(words_poses_tokens, None)
         
         output = self.predict_instance(instance)
         attention_logits = output['attention_logits']

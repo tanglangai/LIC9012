@@ -38,38 +38,47 @@ class Modified_F1(F1Measure):
             A masking tensor the same size as ``gold_labels``.
         """
         predictions, gold_labels, mask = self.unwrap_to_tensors(predictions, gold_labels, mask)
-
+        
         num_classes = predictions.size(-1)
         if (gold_labels >= num_classes).any():
             raise ConfigurationError("A gold label passed to F1Measure contains an id >= {}, "
                                      "the number of classes.".format(num_classes))
+        
+        predictions = predictions[:, :, :, 1:]
+        gold_labels = gold_labels[:, :, :, 1:]
+        
+        assert gold_labels.shape[3] == 50
+        
         if mask is None:
             mask = (gold_labels != -1).float()
-            
+        
+        predictions = torch.argmax(predictions, dim=-1)
+        gold_labels = torch.argmax(gold_labels, dim=-1)
+        mask = mask.sum(-1).ne(0)
+        
         mask = mask.float()
-        gold_labels = gold_labels.float()
-        positive_label_mask = gold_labels.eq(self._positive_label).float()
+        gold_labels = gold_labels.long()
+        positive_label_mask = gold_labels.ne(49).float()
         negative_label_mask = 1.0 - positive_label_mask
-
-        predictions=torch.round(predictions)
+        
 
         # True Negatives: correct non-positive predictions.
         correct_null_predictions = (predictions !=
-                                    self._positive_label).float() * negative_label_mask
+                                    gold_labels).float() * negative_label_mask
         self._true_negatives += (correct_null_predictions.float() * mask).sum()
 
         # True Positives: correct positively labeled predictions.
         correct_non_null_predictions = (predictions ==
-                                        self._positive_label).float() * positive_label_mask
+                                        gold_labels).float() * positive_label_mask
         self._true_positives += (correct_non_null_predictions * mask).sum()
 
         # False Negatives: incorrect negatively labeled predictions.
         incorrect_null_predictions = (predictions !=
-                                      self._positive_label).float() * positive_label_mask
+                                      gold_labels).float() * positive_label_mask
         self._false_negatives += (incorrect_null_predictions * mask).sum()
 
         # False Positives: incorrect positively labeled predictions
         incorrect_non_null_predictions = (predictions ==
-                                          self._positive_label).float() * negative_label_mask
+                                          gold_labels).float() * negative_label_mask
         self._false_positives += (incorrect_non_null_predictions * mask).sum()
 
