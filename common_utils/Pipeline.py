@@ -22,12 +22,16 @@ class Pipeline(object):
             raise TypeError
         self.function_lst.append(func)
     
-    def run(self, data: Dict) -> Dict:
+    def run(self, *args) -> Dict:
+        
         #我们约定数据能够输入输出是一个格式的，这样才能不断调用函数。
         for func in self.function_lst:
-            data = func(data)
-        return data
+            args = func(*args)
 
+        return args
+    
+    def __call__(self, *arg):
+        return self.run(*arg)
 
 if __name__ == '__main__':
     a=lambda x: x[0]

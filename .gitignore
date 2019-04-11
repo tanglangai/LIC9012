@@ -1,7 +1,7 @@
 *.pkl
 *.th
 *.pth
-members/
+
 .idea
 data/original_data
 *.pyc
