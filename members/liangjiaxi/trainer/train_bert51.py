@@ -13,7 +13,7 @@ import_submodules('members.liangjiaxi.mylibrary')
 
 params = Params.from_file('../experiment/bert51_baseline.json')
 
-serialization_dir = '../../../tmp/model_weight/bert51baseline_4_111'
+serialization_dir = '../../../tmp/model_weight/bert51baseline_4_11'
 
 model = train_model(
                     params,

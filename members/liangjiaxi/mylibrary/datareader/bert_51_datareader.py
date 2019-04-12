@@ -63,8 +63,12 @@ class Bert51_DataReader(DatasetReader):
             #转换标签
             if 'spo_list' in jsondata:
                 spo_list = jsondata['spo_list']
-                labels_tensor: torch.Tensor = convert_spolist2tensor(words, label_scheme_dict,
-                                                          spo_list)
+                try:
+                    labels_tensor: torch.Tensor = convert_spolist2tensor(words, label_scheme_dict,
+                                                                         spo_list)
+                except Exception as e:
+                    print(e)
+                    continue
             else:
                 labels_tensor = None
                 

@@ -6,7 +6,7 @@ from allennlp.training.metrics.metric import Metric
 from allennlp.training.metrics.f1_measure import F1Measure
 from allennlp.common.checks import ConfigurationError
 
-
+from sklearn.metrics import precision_score, recall_score, f1_score
 @Metric.register("modified_f1")
 class Modified_F1(F1Measure):
     """
@@ -15,13 +15,13 @@ class Modified_F1(F1Measure):
     the tag you are interested in, resulting in the Precision, Recall and F1 score being
     calculated for this tag only.
     """
-    def __init__(self) -> None:
-        self._positive_label =1
-        self._true_positives = 0.0
-        self._true_negatives = 0.0
-        self._false_positives = 0.0
-        self._false_negatives = 0.0
 
+    def __init__(self):
+        self.pre_score = 0
+        self.recall_score = 0
+        self.f1_score = 0
+        
+        
     def __call__(self,
                  predictions: torch.Tensor,
                  gold_labels: torch.Tensor,
@@ -44,11 +44,6 @@ class Modified_F1(F1Measure):
             raise ConfigurationError("A gold label passed to F1Measure contains an id >= {}, "
                                      "the number of classes.".format(num_classes))
         
-        predictions = predictions[:, :, :, 1:]
-        gold_labels = gold_labels[:, :, :, 1:]
-        
-        assert gold_labels.shape[3] == 50
-        
         if mask is None:
             mask = (gold_labels != -1).float()
         
@@ -56,29 +51,37 @@ class Modified_F1(F1Measure):
         gold_labels = torch.argmax(gold_labels, dim=-1)
         mask = mask.sum(-1).ne(0)
         
-        mask = mask.float()
+        mask = mask.long()
         gold_labels = gold_labels.long()
-        positive_label_mask = gold_labels.ne(49).float()
-        negative_label_mask = 1.0 - positive_label_mask
+        
+        #通过mask将有效的值提取出来
+        all_predictions = predictions[mask == 1]
+        all_gold_labels = gold_labels[mask == 1]
+        assert all_predictions.shape == all_gold_labels.shape
+        
+        # [None, 'binary' (default), 'micro', 'macro', 'samples', \
+        #                'weighted']
+        
+        average = 'weighted'
+        self.pre_score = precision_score(all_gold_labels,all_predictions,average=average)
+        self.recall_score = recall_score(all_gold_labels,all_predictions,average=average)
+        self.f1_score = f1_score(all_gold_labels,all_predictions,average=average)
+        
         
 
-        # True Negatives: correct non-positive predictions.
-        correct_null_predictions = (predictions !=
-                                    gold_labels).float() * negative_label_mask
-        self._true_negatives += (correct_null_predictions.float() * mask).sum()
+    def get_metric(self, reset: bool = False):
+        """
+        Returns
+        -------
+        A tuple of the following metrics based on the accumulated count statistics:
+        precision : float
+        recall : float
+        f1-measure : float
+        """
 
-        # True Positives: correct positively labeled predictions.
-        correct_non_null_predictions = (predictions ==
-                                        gold_labels).float() * positive_label_mask
-        self._true_positives += (correct_non_null_predictions * mask).sum()
-
-        # False Negatives: incorrect negatively labeled predictions.
-        incorrect_null_predictions = (predictions !=
-                                      gold_labels).float() * positive_label_mask
-        self._false_negatives += (incorrect_null_predictions * mask).sum()
-
-        # False Positives: incorrect positively labeled predictions
-        incorrect_non_null_predictions = (predictions ==
-                                          gold_labels).float() * negative_label_mask
-        self._false_positives += (incorrect_non_null_predictions * mask).sum()
-
+        return self.pre_score, self.recall_score, self.f1_score
+    
+    def reset(self):
+        self.pre_score = 0
+        self.recall_scorel = 0
+        self.f1_score = 0

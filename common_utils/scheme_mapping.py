@@ -106,8 +106,11 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
     
                 height = match_(obj, sub, spo, label_scheme_dict)
                 if height is not None:
-
                     temp_tensor[i, j, height] = 1
+                    # 注意这里的break！！！！！！
+                    # 我们如果找到一个了，就直接break就好，即只保留一个！！！！
+                    # break兼职很强
+                    break
                 # 之前的一个重大的bug！！！！！！！！！！！！！！
                 # 我们至少要有一个1 ，如果没有匹配的话，就将第 0 位置置为 1
             if temp_tensor[i, j, :].sum().item() == 0:
@@ -131,10 +134,8 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
         
     #按理说，每一对词，51列中有且只能有一个1，因此这条语句永远是真的
     #若不通过，说明一对词被标注成了多个scheme，检查！
-    
-    
-    
-    if  temp_tensor.sum().item() != n * n:
+
+    if temp_tensor.sum().item() != n * n:
         m = temp_tensor.shape[0]
         for i in range(m):
             for j in range(m):
@@ -145,7 +146,18 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
                     print(words[j])
                     print(words)
                     print(a)
+                    
+                    i = -1
+                    for d in a:
+                        i+=1
+                        if d  == 1:
+                            print(label_scheme_dict[i])
+                    print(spo_list)
+                    print()
+                    
+                    # print(label_scheme_dict)
                     assert False
+                    
         print("temp_tensor.sum() is {}",format(temp_tensor.sum()))
         print("n * n is {}".format(n * n))
         raise Exception("一对词被标注成了多个scheme？")

@@ -54,10 +54,15 @@ class Bert_51_Model(Model):
         
         #损失函数的选择？
         # self.loss = F.poisson_nll_loss
-        self.loss = F.poisson_nll_loss
+        weights = torch.ones(51)
         
+        weights[0] =1.0 / 600
+        
+        self.loss = torch.nn.CrossEntropyLoss(weight = weights, ignore_index = -1)
+
+        # from allennlp.training.metrics.f1_measure import F1Measure
+        # self.metric = F1Measure(positive_label=0)
         self.metric = Modified_F1()
-        
     
         self.softmax = torch.nn.Softmax(dim=-1)
     
@@ -67,7 +72,7 @@ class Bert_51_Model(Model):
         # 没有了encoder，mask也没啥用了
         # words_poses_mask = get_text_field_mask(words_poses_field)
         words_poses_embeddings = self.text_field_embedder(words_poses_field)
-        
+        ner_labels = ner_labels.long()
         assert len(words_poses_embeddings.shape) == 3
         
         if self.linear_layer:
@@ -96,9 +101,28 @@ class Bert_51_Model(Model):
         output = {'attention_logits': attention}
         
         if ner_labels is not None and ner_labels.sum().item() != 0:
+            
             self.metric(attention, ner_labels)
             
-            output["loss"] = self.loss(attention, ner_labels)
+            all_loss = 0
+            batch_size, n, _, _ = ner_labels.shape
+            # for batch in range(batch_size):
+            #     for i in range(n):
+            #         for j in range(n):
+            #             a = attention[batch, i, j, :].sum()
+            #             b = ner_labels[batch, i, j, :].sum()
+            #             c = ner_labels[batch, i, j, :]
+            #             if b.item() > 1:
+            #                 print()
+            #             t = self.loss(attention[batch, i, j, :], ner_labels[batch, i, j, :])
+            for i in range(n):
+                for j in range(n):
+                    
+                    a = ner_labels[:, i, j, :]
+                    a =torch.argmax(a,dim=-1)
+                    t = self.loss(attention[:, i, j, :], a)
+                    all_loss += t
+            output["loss"] = all_loss
 
             # print(torch.argmax(attention, dim=-1))
         

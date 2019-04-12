@@ -2,10 +2,10 @@
 
 {
     //////////////////////////////////////////////////////////
-//    "train_data_path":      "/home/liangjx/K40extract_info/data/origin_data/train_data.json",
-//    "validation_data_path": "/home/liangjx/K40extract_info/data/origin_data/dev_data.json",
-    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
-    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
+    "train_data_path":      "/home/liangjx/K40extract_info/data/origin_data/train_data.json",
+    "validation_data_path": "/home/liangjx/K40extract_info/data/origin_data/dev_data.json",
+//    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
+//    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
     //////////////////////////////////////////////////////////
     "dataset_reader": {
         "type": "bert_51",
@@ -64,13 +64,13 @@
     //////////////////////////////////////////////////////////
     "iterator": {
         "type": "bucket",
-        "batch_size": 64 ,
+        "batch_size": 6 ,
         "sorting_keys": [["words_poses_field", "num_tokens"]]
     },
     //////////////////////////////////////////////////////////
     "trainer": {
         "num_epochs": 20,
-        "cuda_device": -1,
+        "cuda_device": [0, 1],
         "optimizer": {
             "type": "adam",
             "lr": 1e-4
@@ -81,6 +81,6 @@
           "type": "exponential",
           "gamma":  0.9
         },
-        "patience": null
+        "patience": 5
     }
 }
