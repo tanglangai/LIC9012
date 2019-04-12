@@ -12,7 +12,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
-
+from dataUtils.make_label_from_raw import wsearch
 
 def generaterows(file_pth: str) ->dict:
     """
@@ -52,31 +52,31 @@ def is_match_scheme(scheme_a: Dict[str, str], scheme_b: Dict[str, str])->bool:
         return True
     return False
 
-def match_(words: List[str], spo: Dict[str,str], label_scheme_dict: Dict[str, dict]):
-    """
-    判断spo中的客体主体这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
-    返回 1~50 之间的值，
-    不是，返回0
-    """
-    # spo 是一条答案
-    obj = spo['object']
-    sub = spo['subject']
-    predicate = spo['predicate']
-    
-    # 如果词列表中有词包含了obj 且 sub，那么再去寻找是哪一个视图
-    # 注意，用简单的in来判断是不是，容易犯 哥伦比亚 将 单独"比"这个字算入entity 的错误。
-    i = -1
-    j = -1
-    for index, w in enumerate(words):
-    
-    if any([w in obj for w in words]) and any([w in sub for w in words]):
-        #肯定能找到一个视图的，找不到
-        if predicate not in label_scheme_dict.keys():
-            raise Exception("答案应该能够找到对应的标签")
-        height = label_scheme_dict[predicate]['position']
-    else:
-        height = 0
-    
+# def match_(words: List[str], spo: Dict[str,str], label_scheme_dict: Dict[str, dict]):
+#     """
+#     判断spo中的客体主体这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
+#     返回 1~50 之间的值，
+#     不是，返回0
+#     """
+#     # spo 是一条答案
+#     obj = spo['object']
+#     sub = spo['subject']
+#     predicate = spo['predicate']
+#
+#     # 如果词列表中有词包含了obj 且 sub，那么再去寻找是哪一个视图
+#     # 注意，用简单的in来判断是不是，容易犯 哥伦比亚 将 单独"比"这个字算入entity 的错误。
+#     i = -1
+#     j = -1
+#     for index, w in enumerate(words):
+#
+#     if any([w in obj for w in words]) and any([w in sub for w in words]):
+#         #肯定能找到一个视图的，找不到
+#         if predicate not in label_scheme_dict.keys():
+#             raise Exception("答案应该能够找到对应的标签")
+#         height = label_scheme_dict[predicate]['position']
+#     else:
+#         height = 0
+#
         
         
         
@@ -119,8 +119,21 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[str, dict],
 
     for spo in spo_list:
         assert isinstance(spo, dict)
-        i, j, height = match_(words, spo, label_scheme_dict)
         
+        obj_locate = wsearch(words, spo['object'])
+        obj_loc = []
+        for i, bool_ in enumerate(obj_locate):
+            if bool_:
+                obj_loc.append(i)
+
+        sbj_locate = wsearch(words, spo['subject'])
+        sbj_loc = []
+        for i, bool_ in enumerate(sbj_locate):
+            if bool_:
+                sbj_loc.append(i)
+        
+        
+
     #按理说，每一对词，51列中有且只能有一个1，因此这条语句永远是真的
     #若不通过，说明一对词被标注成了多个scheme，检查！
 

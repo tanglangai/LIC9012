@@ -80,7 +80,8 @@ def analysis_one_sample(dct):
                 obj_loc.append(i)
         subject_locates.append(obj_loc)
         subject_pos.append(obj_pos)
-
+        
+    # relations 等都是二维的表格
     res = {'relations':relations,
            'object_type':object_type,
            'subject_type':subject_type,
@@ -89,4 +90,6 @@ def analysis_one_sample(dct):
            'object_pos':object_pos,
            'subject_pos':subject_pos}
     return res
+
+
 
