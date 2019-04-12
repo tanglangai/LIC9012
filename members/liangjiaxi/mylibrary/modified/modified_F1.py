@@ -6,7 +6,7 @@ from allennlp.training.metrics.metric import Metric
 from allennlp.training.metrics.f1_measure import F1Measure
 from allennlp.common.checks import ConfigurationError
 
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import precision_score, recall_score, f1_score, precision_recall_fscore_support
 @Metric.register("modified_f1")
 class Modified_F1(F1Measure):
     """
@@ -63,10 +63,13 @@ class Modified_F1(F1Measure):
         #                'weighted']
         
         average = 'weighted'
-        self.pre_score = precision_score(all_gold_labels,all_predictions,average=average)
-        self.recall_score = recall_score(all_gold_labels,all_predictions,average=average)
-        self.f1_score = f1_score(all_gold_labels,all_predictions,average=average)
         
+        labels = list(range(1, 51))
+        self.pre_score, self.recall_score, self.f1_score, _ = precision_recall_fscore_support(all_gold_labels,
+                                                                                           all_predictions,
+                                                                                           average = average,
+                                                                                           labels = labels)
+
         
 
     def get_metric(self, reset: bool = False):

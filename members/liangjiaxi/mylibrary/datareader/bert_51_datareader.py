@@ -20,14 +20,11 @@ import json
 import numpy as np
 
 from members.liangjiaxi.mylibrary.Config import Config
-from common_utils.scheme_mapping import generaterows, scheme2index, postag2wordpos, convert_spolist2tensor
-
-
+from common_utils.scheme_mapping import generaterows, scheme2index, postag2wordpos, convert_spolist2tensor, \
+    convert2tensor
+from dataUtils.make_label_from_raw import analysis_one_sample
 
 torch.manual_seed(1)
-
-
-
 
 @DatasetReader.register('bert_51')
 class Bert51_DataReader(DatasetReader):
@@ -45,7 +42,8 @@ class Bert51_DataReader(DatasetReader):
         """
         for line in generaterows(file_path):
             jsondata = json.loads(line)
-            
+            if len(jsondata['postag']) > 50:
+                continue
             #加载{1，视图一} 这种字典
             scheme_pth = Config.scheme_pth
             label_scheme_dict = scheme2index(scheme_pth)
@@ -54,40 +52,36 @@ class Bert51_DataReader(DatasetReader):
             postag = jsondata['postag']
             if not postag:
                 continue
-            #得到列表形式的数据
-            words, poses = postag2wordpos(postag)
+            
+            data_info = analysis_one_sample(jsondata)
+            n = len(jsondata['postag'])
+            relations = data_info['relations']
+            object_locates = data_info['object_locates']
+            subject_locates = data_info['subject_locates']
+            object_type = data_info['object_type']
+            subject_type = data_info['subject_type']
 
-            # 调用预处理的pipeline
-            words, poses = Config.pre_pipeline.run(words, poses)
-            assert len(words) == len(poses)
-            #转换标签
-            if 'spo_list' in jsondata:
-                spo_list = jsondata['spo_list']
-                try:
-                    labels_tensor: torch.Tensor = convert_spolist2tensor(words, label_scheme_dict,
-                                                                         spo_list)
-                except Exception as e:
-                    print(e)
-                    continue
-            else:
-                labels_tensor = None
-                
-            #必须得拆开来写，
-            #merge一些东西   --->   convert_spolist2tensor   --->   replace_some_nourns将一些名词替换成其他的
+            labels_tensor = convert2tensor(relations, object_locates, subject_locates,
+                                           object_type, subject_type, label_scheme_dict, n)
+            
+        
+            # replace_some_nourns将一些名词替换成其他的
+            words = [ins['word'] for ins in jsondata['postag']]
+            poses = [ins['pos'] for ins in jsondata['postag']]
             from common_utils.preprocess_merge_something import replace_some_nourns
             words, poses, position_dict = replace_some_nourns(words, poses)
             # 注意这里转换成了Token
             words_poses_tokens = []
-            # 注意新添了一个列表,表示是不是名词啊之类的
-            #是名词则意味着可能是答案，至于动词形容词那肯定就不是答案了。
-            reserved_pos = []
+            # # 注意新添了一个列表,表示是不是名词啊之类的
+            # #是名词则意味着可能是答案，至于动词形容词那肯定就不是答案了。
+            # reserved_pos = []
             for word, pos in zip(words, poses):
-                if pos in Config.RESERVED_LSIT:
-                    tmp_id = 1
-                else:
-                    tmp_id = 0
-
-                reserved_pos.append(tmp_id)
+                # if pos in Config.RESERVED_LSIT:
+                #     tmp_id = 1
+                # else:
+                #     tmp_id = 0
+            #
+            #     reserved_pos.append(tmp_id)
 
                 # 关键的一步，将tag标签赋予Token，而且配置文件里的token_indexers参数要添加一个 pos_tag
                 tmp_token = Token(word, tag_=pos)

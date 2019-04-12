@@ -12,7 +12,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
-from dataUtils.make_label_from_raw import wsearch
+
 
 def generaterows(file_pth: str) ->dict:
     """
@@ -52,34 +52,21 @@ def is_match_scheme(scheme_a: Dict[str, str], scheme_b: Dict[str, str])->bool:
         return True
     return False
 
-# def match_(words: List[str], spo: Dict[str,str], label_scheme_dict: Dict[str, dict]):
-#     """
-#     判断spo中的客体主体这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
-#     返回 1~50 之间的值，
-#     不是，返回0
-#     """
-#     # spo 是一条答案
-#     obj = spo['object']
-#     sub = spo['subject']
-#     predicate = spo['predicate']
-#
-#     # 如果词列表中有词包含了obj 且 sub，那么再去寻找是哪一个视图
-#     # 注意，用简单的in来判断是不是，容易犯 哥伦比亚 将 单独"比"这个字算入entity 的错误。
-#     i = -1
-#     j = -1
-#     for index, w in enumerate(words):
-#
-#     if any([w in obj for w in words]) and any([w in sub for w in words]):
-#         #肯定能找到一个视图的，找不到
-#         if predicate not in label_scheme_dict.keys():
-#             raise Exception("答案应该能够找到对应的标签")
-#         height = label_scheme_dict[predicate]['position']
-#     else:
-#         height = 0
-#
+def match_(obj: str, sub: str, spo: Dict[str, str], label_scheme_dict: Dict[int, dict]):
+    """
+    判断这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
+    返回0~49之间的值，
+    不是，返回0
+    """
+    # 注意，用简单的in来判断是不是，容易犯 哥伦比亚 将 单独"比"这个字算入entity 的错误。
+    if obj in spo['object'] and sub in spo['subject']:
+        for key, scheme in label_scheme_dict.items():
+            if is_match_scheme(spo, scheme):
+                return key
         
-        
-        
+        raise Exception("没有找到对应的label_scheme,这不正常。")
+    else:
+        return None
     
 
 def scheme2index(pth: str) -> Dict[str, int]:
@@ -95,21 +82,20 @@ def scheme2index(pth: str) -> Dict[str, int]:
         for line in file.readlines():
             if not line.strip() or line.strip() == 'EOF':
                 continue
+            
             data = json.loads(line)
-            # index_dict[i] = json.loads(line)
-            predicate = data['predicate']
-            obj_type = data['object_type']
-            sub_type = data['subject_type']
-            index_dict[predicate] = {'position': i,
-                                     'object_type': obj_type,
-                                     'subject_type': sub_type}
+            # predicate = data['predicate']
+            # object_type = data['object_type']
+            # subject_type = data['subject_type']
+            t_key = data['predicate'] + data['object_type'] + data['subject_type']
+            index_dict[t_key] = i
             i += 1
             
     assert len(index_dict) == 50
     return index_dict
 
 
-def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[str, dict],
+def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
                            spo_list: List[Dict[str, str]]) -> torch.Tensor:
     """
     将spo_list转成n*n*51，其中n是句子长度。
@@ -117,23 +103,41 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[str, dict],
     n = len(words)
     temp_tensor = torch.zeros((n, n, 51))
 
-    for spo in spo_list:
-        assert isinstance(spo, dict)
-        
-        obj_locate = wsearch(words, spo['object'])
-        obj_loc = []
-        for i, bool_ in enumerate(obj_locate):
-            if bool_:
-                obj_loc.append(i)
-
-        sbj_locate = wsearch(words, spo['subject'])
-        sbj_loc = []
-        for i, bool_ in enumerate(sbj_locate):
-            if bool_:
-                sbj_loc.append(i)
-        
-        
-
+    for i, obj in enumerate(words):
+        for j, sub in enumerate(words):
+            
+            for spo in spo_list:
+                
+                assert isinstance(spo, dict)
+    
+                height = match_(obj, sub, spo, label_scheme_dict)
+                if height is not None:
+                    temp_tensor[i, j, height] = 1
+                    # 注意这里的break！！！！！！
+                    # 我们如果找到一个了，就直接break就好，即只保留一个！！！！
+                    # break兼职很强
+                    break
+                # 之前的一个重大的bug！！！！！！！！！！！！！！
+                # 我们至少要有一个1 ，如果没有匹配的话，就将第 0 位置置为 1
+            if temp_tensor[i, j, :].sum().item() == 0:
+                temp_tensor[i,j,0] = 1
+                
+    # return temp_tensor.cpu().numpy().tolist()
+    #之前将数据放入了cpu中
+    #CPU和GPU之间互换数据是一件十分浪费时间的事情。
+    #尝试直接返回tensor的形式。
+    
+    #{"postag": [{"word": "丝角蝗科", "pos": "nz"}, {"word": "，", "pos": "w"}, {"word": "Oedipodidae", "pos": "nz"}, {"word": "，", "pos": "w"},
+    # {"word": "昆虫纲直翅目蝗总科", "pos": "nz"}, {"word": "的", "pos": "u"}, {"word": "一个科", "pos": "n"}],
+    # "text": "丝角蝗科，Oedipodidae，昆虫纲直翅目蝗总科的一个科",
+    # "spo_list": [{"predicate": "目", "object_type": "目", "subject_type": "生物", "object": "直翅目", "subject": "丝角蝗科"}]}
+    
+    "会有问题，如上那一条，因为错误分词的结果"
+    # if temp_tensor[:,:,0].sum() == n*n:
+    #     print("ALERT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    #     print("起码有一个标注了的吧，我之前是因为预处理在这个函数之前调用了，导致“周星驰”不会出现在“NAME”之中")
+    
+    
     #按理说，每一对词，51列中有且只能有一个1，因此这条语句永远是真的
     #若不通过，说明一对词被标注成了多个scheme，检查！
 
@@ -166,6 +170,38 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[str, dict],
     return temp_tensor
     
 
+
+def convert2tensor(relations: List[List],
+                   object_locates: List[List],
+                   subject_locates: List[List],
+                    object_type: str,
+                    subject_type: str,
+                   label_scheme_dict: Dict[str, int],
+                   n: int) ->torch.Tensor:
+
+    temp_tensor = torch.zeros((n, n, 51))
+    
+    for index, relation in enumerate(relations):
+        cur_object_locates = object_locates[index]
+        cur_subject_locates = subject_locates[index]
+        cur_object_type = object_type[index]
+        cur_subject_type = subject_type[index]
+        #过滤掉没提取到的，例如分词颗粒度太粗，我们认为这个词不标注。
+        if len(cur_object_locates) == 0 or len(cur_subject_locates) == 0:
+            continue
+        
+        height = label_scheme_dict[relation + cur_object_type + cur_subject_type]
+        
+        for i in cur_object_locates:
+            for j in cur_subject_locates:
+                temp_tensor[i, j, height] =1
+                
+    for i in range(n):
+        for j in range(n):
+            t = temp_tensor[i, j, :]
+            if t.sum().item() == 0:
+                temp_tensor[i, j, 0] = 1
+    return temp_tensor
     
 if __name__ == '__main__':
     #能成功打印

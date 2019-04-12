@@ -36,14 +36,14 @@ class Seq2seq_attention(Model):
     def __init__(self,
                  vocab: Vocabulary,
                  text_field_embedder: TextFieldEmbedder,
-                
+                seq2seq_encoder: Seq2SeqEncoder,
                  matrix_attention: MatrixAttention,
                  linear_layer: FeedForward = None
                  ) -> None:
         super(Seq2seq_attention, self).__init__(vocab)
         
         self.text_field_embedder = text_field_embedder
-        
+        self.seq2seq_encoder = seq2seq_encoder
         self.linear_layer = linear_layer
         
         self.matrix_attention = matrix_attention
@@ -52,7 +52,7 @@ class Seq2seq_attention(Model):
 
         # 损失函数的选择？
         weights = torch.ones(51)
-        weights[0] = 1.0 / 600
+        weights[0] = 0
         
         self.loss = torch.nn.CrossEntropyLoss(weight=weights, ignore_index=-1)
         
@@ -65,8 +65,8 @@ class Seq2seq_attention(Model):
     def forward(self, words_poses_field: Dict[str, torch.Tensor],
                 # reserved_pos_field: np.array,
                 ner_labels: np.array = None):
-        # 没有了encoder，mask也没啥用了
-        # words_poses_mask = get_text_field_mask(words_poses_field)
+
+        words_poses_mask = get_text_field_mask(words_poses_field)
         words_poses_embeddings = self.text_field_embedder(words_poses_field)
         ner_labels = ner_labels.long()
         assert len(words_poses_embeddings.shape) == 3
@@ -76,10 +76,10 @@ class Seq2seq_attention(Model):
         else:
             embeddings = words_poses_embeddings
         
-        # TODO(梁家熙)过滤掉v词的一些行
-        # 将一些embedding 置为0，可以加速运算（？）
-        # reserved_pos_field = reserved_pos_field.byte()
-        # embeddings[1 - reserved_pos_field] = 0
+        # 经过了seq 2 seq的  编码的结果
+        embeddings = self.seq2seq_encoder(embeddings, words_poses_mask)
+        
+       
         
         attention = self.matrix_attention(embeddings, embeddings)
         
@@ -87,13 +87,12 @@ class Seq2seq_attention(Model):
         attention = attention.permute(0, 2, 3, 1)
         assert attention.shape[-1] == 51
         
-        # #将不可能出现的赋予一个很大的负值，这样经过softmax之后就是0了
-        # attention[reserved_pos_field, :, :] = -9999
-        # attention = attention.permute(0, 2, 1, 3)
-        # attention[reserved_pos_field, :, :] = -9999
-        # attention = attention.permute(0, 2, 1, 3)
-        
+       
         attention = self.softmax(attention)
+        # 不知道那种放缩的方法会不会更好
+        
+        
+        
         output = {'attention_logits': attention}
         
         if ner_labels is not None and ner_labels.sum().item() != 0:
@@ -102,15 +101,7 @@ class Seq2seq_attention(Model):
             
             all_loss = 0
             batch_size, n, _, _ = ner_labels.shape
-            # for batch in range(batch_size):
-            #     for i in range(n):
-            #         for j in range(n):
-            #             a = attention[batch, i, j, :].sum()
-            #             b = ner_labels[batch, i, j, :].sum()
-            #             c = ner_labels[batch, i, j, :]
-            #             if b.item() > 1:
-            #                 print()
-            #             t = self.loss(attention[batch, i, j, :], ner_labels[batch, i, j, :])
+   
             for i in range(n):
                 for j in range(n):
                     a = ner_labels[:, i, j, :]
