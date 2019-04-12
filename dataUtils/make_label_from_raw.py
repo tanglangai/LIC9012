@@ -1,3 +1,13 @@
+def my_finditer(lookfor, text):
+    lgth = len(lookfor)
+    start_from = 0
+    while True:
+        begin = text.find(lookfor, start_from)
+        if begin == -1:
+            break
+        start_from = begin+lgth
+        yield (begin, begin+lgth)
+
 def wsearch(alist, regex):
     regex = regex.lower()
     lgths = [len(s) for s in alist]
