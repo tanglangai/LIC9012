@@ -1,0 +1,86 @@
+// embedding + seq2seq +matrix_attention 结构
+
+{
+    //////////////////////////////////////////////////////////
+    "train_data_path":      "/home/liangjx/K40extract_info/data/origin_data/train_data.json",
+    "validation_data_path": "/home/liangjx/K40extract_info/data/origin_data/dev_data.json",
+//    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
+//    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
+    //////////////////////////////////////////////////////////
+    "dataset_reader": {
+        "type": "bert_51",
+        "lazy": true,
+        "token_indexers": {
+            "words_poses_field": {
+                "type": "bert-pretrained",
+                "pretrained_model": "/home/liangjx/.pytorch_pretrained_bert/bert-base-chinese-vocab.txt",
+                "do_lowercase": false,
+                "use_starting_offsets": false
+            },
+
+            "poses": { "type": "pos_tag" }
+        }
+    },
+
+    //////////////////////////////////////////////////////////
+    "model": {
+        "type": "Bert51_model",
+
+        "text_field_embedder": {
+            "allow_unmatched_keys": true,
+            "embedder_to_indexer_map": {
+            "words_poses_field": ["words_poses_field", "words_poses_field-offsets"],
+            "poses": ["poses"]
+            },
+            "token_embedders": {
+                "words_poses_field": {
+                    "type": "bert-pretrained",
+                    "pretrained_model": "/home/liangjx/.pytorch_pretrained_bert/bert-base-chinese.tar.gz",
+
+                    // 是否训练bert
+                    "requires_grad":true,
+                    //If ``True``, then only return the top layer instead of apply the scalar mix.
+                    "top_layer_only":false
+                },
+                "poses": {
+                    "vocab_namespace": "pos_tokens",
+                    "type": "embedding",
+                    "embedding_dim": 20
+                }
+            }
+        },
+
+
+        "matrix_attention": {
+            "type": "bilinear",
+            "matrix_1_dim": 788,
+            "matrix_2_dim": 788,
+            "label_dim": 51,
+            "use_input_biases": true,
+            "activation": null
+        }
+    },
+
+    //////////////////////////////////////////////////////////
+    "iterator": {
+        "type": "bucket",
+        "batch_size": 6 ,
+        "sorting_keys": [["words_poses_field", "num_tokens"]]
+    },
+    //////////////////////////////////////////////////////////
+    "trainer": {
+        "num_epochs": 20,
+        "cuda_device": [0, 1],
+        "optimizer": {
+            "type": "adam",
+            "lr": 1e-4
+        },
+         "num_serialized_models_to_keep":2,
+
+         "learning_rate_scheduler":{
+          "type": "exponential",
+          "gamma":  0.9
+        },
+        "patience": 5
+    }
+}

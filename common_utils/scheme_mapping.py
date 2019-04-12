@@ -52,28 +52,42 @@ def is_match_scheme(scheme_a: Dict[str, str], scheme_b: Dict[str, str])->bool:
         return True
     return False
 
-def match_(obj: str, sub: str, spo: Dict[str, str], label_scheme_dict: Dict[int, dict]):
+def match_(words: List[str], spo: Dict[str,str], label_scheme_dict: Dict[str, dict]):
     """
-    判断这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
-    返回0~49之间的值，
+    判断spo中的客体主体这对词，是不是对应spo的object，subject，是的话，再找是label_scheme_dict的哪一个
+    返回 1~50 之间的值，
     不是，返回0
     """
+    # spo 是一条答案
+    obj = spo['object']
+    sub = spo['subject']
+    predicate = spo['predicate']
+    
+    # 如果词列表中有词包含了obj 且 sub，那么再去寻找是哪一个视图
     # 注意，用简单的in来判断是不是，容易犯 哥伦比亚 将 单独"比"这个字算入entity 的错误。
-    if obj in spo['object'] and sub in spo['subject']:
-        for key, scheme in label_scheme_dict.items():
-            if is_match_scheme(spo, scheme):
-                return key
-        
-        raise Exception("没有找到对应的label_scheme,这不正常。")
+    i = -1
+    j = -1
+    for index, w in enumerate(words):
+    
+    if any([w in obj for w in words]) and any([w in sub for w in words]):
+        #肯定能找到一个视图的，找不到
+        if predicate not in label_scheme_dict.keys():
+            raise Exception("答案应该能够找到对应的标签")
+        height = label_scheme_dict[predicate]['position']
     else:
-        return None
+        height = 0
+    
+        
+        
+        
     
 
-def scheme2index(pth: str) -> Dict[int, dict]:
+def scheme2index(pth: str) -> Dict[str, int]:
     """
     将scheme对应成1-50!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     把0 空出来！！！！！！！！
     返回五十种视图的字典。
+    修改一下，key 是str形式的字典，而value 则是第几个值。
     """
     index_dict = {}
     i = 1
@@ -81,15 +95,21 @@ def scheme2index(pth: str) -> Dict[int, dict]:
         for line in file.readlines():
             if not line.strip() or line.strip() == 'EOF':
                 continue
-            
-            index_dict[i] = json.loads(line)
-            
+            data = json.loads(line)
+            # index_dict[i] = json.loads(line)
+            predicate = data['predicate']
+            obj_type = data['object_type']
+            sub_type = data['subject_type']
+            index_dict[predicate] = {'position': i,
+                                     'object_type': obj_type,
+                                     'subject_type': sub_type}
             i += 1
+            
     assert len(index_dict) == 50
     return index_dict
 
 
-def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
+def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[str, dict],
                            spo_list: List[Dict[str, str]]) -> torch.Tensor:
     """
     将spo_list转成n*n*51，其中n是句子长度。
@@ -97,40 +117,9 @@ def convert_spolist2tensor(words: List[str], label_scheme_dict: Dict[int, dict],
     n = len(words)
     temp_tensor = torch.zeros((n, n, 51))
 
-    for i, obj in enumerate(words):
-        for j, sub in enumerate(words):
-            
-            for spo in spo_list:
-                
-                assert isinstance(spo, dict)
-    
-                height = match_(obj, sub, spo, label_scheme_dict)
-                if height is not None:
-                    temp_tensor[i, j, height] = 1
-                    # 注意这里的break！！！！！！
-                    # 我们如果找到一个了，就直接break就好，即只保留一个！！！！
-                    # break兼职很强
-                    break
-                # 之前的一个重大的bug！！！！！！！！！！！！！！
-                # 我们至少要有一个1 ，如果没有匹配的话，就将第 0 位置置为 1
-            if temp_tensor[i, j, :].sum().item() == 0:
-                temp_tensor[i,j,0] = 1
-                    
-    # return temp_tensor.cpu().numpy().tolist()
-    #之前将数据放入了cpu中
-    #CPU和GPU之间互换数据是一件十分浪费时间的事情。
-    #尝试直接返回tensor的形式。
-    
-    #{"postag": [{"word": "丝角蝗科", "pos": "nz"}, {"word": "，", "pos": "w"}, {"word": "Oedipodidae", "pos": "nz"}, {"word": "，", "pos": "w"},
-    # {"word": "昆虫纲直翅目蝗总科", "pos": "nz"}, {"word": "的", "pos": "u"}, {"word": "一个科", "pos": "n"}],
-    # "text": "丝角蝗科，Oedipodidae，昆虫纲直翅目蝗总科的一个科",
-    # "spo_list": [{"predicate": "目", "object_type": "目", "subject_type": "生物", "object": "直翅目", "subject": "丝角蝗科"}]}
-    
-    "会有问题，如上那一条，因为错误分词的结果"
-    # if temp_tensor[:,:,0].sum() == n*n:
-    #     print("ALERT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    #     print("起码有一个标注了的吧，我之前是因为预处理在这个函数之前调用了，导致“周星驰”不会出现在“NAME”之中")
-        
+    for spo in spo_list:
+        assert isinstance(spo, dict)
+        i, j, height = match_(words, spo, label_scheme_dict)
         
     #按理说，每一对词，51列中有且只能有一个1，因此这条语句永远是真的
     #若不通过，说明一对词被标注成了多个scheme，检查！
