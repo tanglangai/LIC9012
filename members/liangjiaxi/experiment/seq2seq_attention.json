@@ -77,7 +77,7 @@
             "type": "bilinear",
             "matrix_1_dim": 340,
             "matrix_2_dim": 340,
-            "label_dim": 51,
+            "label_dim": 50,
             "use_input_biases": true,
             "activation": null
         }

@@ -179,7 +179,7 @@ def convert2tensor(relations: List[List],
                    label_scheme_dict: Dict[str, int],
                    n: int) ->torch.Tensor:
 
-    temp_tensor = torch.zeros((n, n, 51))
+    temp_tensor = torch.zeros((n, n, 50))
     
     for index, relation in enumerate(relations):
         cur_object_locates = object_locates[index]
@@ -194,13 +194,25 @@ def convert2tensor(relations: List[List],
         
         for i in cur_object_locates:
             for j in cur_subject_locates:
-                temp_tensor[i, j, height] =1
+                if temp_tensor[i, j, :].sum() == 0:
+                    temp_tensor[i, j, height -1] = 1
                 
+    #用于做检查用的
     for i in range(n):
         for j in range(n):
-            t = temp_tensor[i, j, :]
-            if t.sum().item() == 0:
-                temp_tensor[i, j, 0] = 1
+            a = temp_tensor[i, j, :]
+            if a.sum().item() >1:
+                print('*'*10)
+                print(i)
+                print(j)
+                print(a)
+                print(relations)
+                print(object_locates)
+                print(subject_locates)
+                print(object_type)
+                print('*' * 10)
+                raise Exception("一对词出现多个标注")
+                
     return temp_tensor
     
 if __name__ == '__main__':

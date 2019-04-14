@@ -44,6 +44,7 @@ class Bert51_DataReader(DatasetReader):
             jsondata = json.loads(line)
             if len(jsondata['postag']) > 50:
                 continue
+                
             #加载{1，视图一} 这种字典
             scheme_pth = Config.scheme_pth
             label_scheme_dict = scheme2index(scheme_pth)
@@ -52,8 +53,11 @@ class Bert51_DataReader(DatasetReader):
             postag = jsondata['postag']
             if not postag:
                 continue
-            
-            data_info = analysis_one_sample(jsondata)
+            try:
+                data_info = analysis_one_sample(jsondata)
+            except ValueError as e:
+                print(e)
+                continue
             n = len(jsondata['postag'])
             relations = data_info['relations']
             object_locates = data_info['object_locates']

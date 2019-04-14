@@ -29,7 +29,7 @@ from allennlp.nn.util import get_text_field_mask, sequence_cross_entropy_with_lo
 from allennlp.predictors import SentenceTaggerPredictor
 from allennlp.data.token_indexers import PretrainedBertIndexer
 from members.liangjiaxi.mylibrary.modified.modified_F1 import Modified_F1
-
+from allennlp.modules.seq2seq_encoders.gated_cnn_encoder import GatedCnnEncoder
 
 @Model.register('seq2seq_attention')
 class Seq2seq_attention(Model):
@@ -50,17 +50,19 @@ class Seq2seq_attention(Model):
         # 如果tensor1是J×1×N×M张量和tensor2是K×M×P张量，将一个J×K×N×P张量。
         # 如果tensor1是J×1×N×M张量和tensor2是K×M×P张量，将一个J×K×N×P张量。
 
-        # 损失函数的选择？
-        weights = torch.ones(51)
-        weights[0] = 0
+        # # 损失函数的选择？
+        # weights = torch.ones(51)
+        # weights[0] = 0
         
-        self.loss = torch.nn.CrossEntropyLoss(weight=weights, ignore_index=-1)
+        self.loss = torch.nn.L1Loss()
+    
         
         # from allennlp.training.metrics.f1_measure import F1Measure
         # self.metric = F1Measure(positive_label=0)
         self.metric = Modified_F1()
         
-        self.softmax = torch.nn.Softmax(dim=-1)
+        # self.activation = torch.nn.Softmax(dim=-1)
+        self.activation = torch.nn.ReLU()
     
     def forward(self, words_poses_field: Dict[str, torch.Tensor],
                 # reserved_pos_field: np.array,
@@ -79,19 +81,21 @@ class Seq2seq_attention(Model):
         # 经过了seq 2 seq的  编码的结果
         embeddings = self.seq2seq_encoder(embeddings, words_poses_mask)
         
-       
-        
         attention = self.matrix_attention(embeddings, embeddings)
         
-        # 输出是batchsize * 51 * seqlen *seqlen,这一条变换成batchsize * seqlen *seqlen * 51
+        # 输出是batchsize * 50 * seqlen *seqlen,这一条变换成batchsize * seqlen *seqlen * 50
         attention = attention.permute(0, 2, 3, 1)
-        assert attention.shape[-1] == 51
         
-       
-        attention = self.softmax(attention)
-        # 不知道那种放缩的方法会不会更好
+        assert attention.shape[-1] == 50
         
+        # 有必要用softmax嘛
+        attention = self.activation (attention)
         
+        # #我们对最大值放缩一下试一试
+        # 失败了
+        #RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation
+        # b = attention.max()
+        # attention /= b
         
         output = {'attention_logits': attention}
         
@@ -99,22 +103,48 @@ class Seq2seq_attention(Model):
             
             self.metric(attention, ner_labels)
             
-            all_loss = 0
-            batch_size, n, _, _ = ner_labels.shape
-   
-            for i in range(n):
-                for j in range(n):
-                    a = ner_labels[:, i, j, :]
-                    a = torch.argmax(a, dim=-1)
-                    t = self.loss(attention[:, i, j, :], a)
-                    all_loss += t
-            output["loss"] = all_loss
+            # all_loss = 0
+            # batch_size, n, _, _ = ner_labels.shape
+            
+            
+            # for i in range(n):
+            #     for j in range(n):
+            #         for batch in range(attention.shape[0]):
+            #             a = ner_labels[batch, i, j, :]
+            #             a = torch.argmax(a)
+            #             t = self.loss(attention[batch, i, j, :], a)
+            #             all_loss += t
+            
+            # 让我们看一看只针对那些有标签的位置的预测行不行
+            # 其实，我们应该可以随机50%的，50%的
+            pos_attention = attention[ner_labels == 1]
+            pos_ner_labels = ner_labels[ner_labels == 1]
+            
+            neg_ner_labels = ner_labels[ner_labels == 0]
+            num_of_pos = len(pos_attention)
+            neg_attention = attention[ner_labels == 0]
+            num_of_neg = len(neg_attention)
+            all_num = num_of_pos + num_of_neg
+     
+            #这个比例可以调整，例如50%  50%还是其他的
+            bernoulli_distribution = torch.bernoulli(neg_attention, num_of_neg/(all_num*1e+5))
+            neg_attention = neg_attention[bernoulli_distribution.long() == 1]
+            neg_ner_labels = neg_ner_labels[bernoulli_distribution.long() == 1]
+            
+            attention = torch.cat([pos_attention,neg_attention], dim = -1)
+            ner_labels = torch.cat([pos_ner_labels,
+                                    neg_ner_labels
+            ], dim = -1)
+            
+            # output["loss"] = all_loss
+            output["loss"] = self.loss(attention, ner_labels.float())
+            # output["loss"] = self.loss(attention, ner_labels.long())
             
             # print(torch.argmax(attention, dim=-1))
         
         return output
     
-    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        acc, recall, f1 = self.metric.get_metric(reset)
-        return {"precision": acc, "recall": recall, 'f1_score': f1}
+    def get_metrics(self, reset: bool = True) -> Dict[str, float]:
+        acc, recall, f1, hs_label_f1 = self.metric.get_metric(reset)
+        return {"precision": acc, "recall": recall, 'f1_score': f1, "has_label_f1": hs_label_f1}
 
