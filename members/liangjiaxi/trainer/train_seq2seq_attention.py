@@ -12,7 +12,7 @@ warnings.filterwarnings('ignore')
 #相对导入的技巧  https://blog.csdn.net/xie_0723/article/details/78004649
 import_submodules('members.liangjiaxi.mylibrary')
 
-params = Params.from_file('../experiment/seq2seq_attention.json')
+params = Params.from_file('../experiment/decoder_baseline.json')
 
 serialization_dir = '../../../tmp/model_weight/seq2seq_attn_model_4_12'
 

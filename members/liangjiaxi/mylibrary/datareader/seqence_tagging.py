@@ -1,9 +1,5 @@
 """
-梁家熙
-
-写的数据读取类
-结构：
-bert读取，51种label
+第一阶段，训练出能够标注实体的数据读取类。
 """
 
 from typing import Iterator, List, Dict, Callable
@@ -15,7 +11,6 @@ from allennlp.data.tokenizers import Token, Tokenizer
 from allennlp.data.fields import TextField, ArrayField, SequenceLabelField, MetadataField, ListField
 import torch
 
-
 import json
 import numpy as np
 
@@ -24,8 +19,12 @@ from common_utils.scheme_mapping import generaterows, scheme2index, postag2wordp
     convert2tensor
 from dataUtils.make_label_from_raw import analysis_one_sample
 
-@DatasetReader.register('bert_51')
-class Bert51_DataReader(DatasetReader):
+torch.manual_seed(1)
+
+
+@DatasetReader.register('my_sequence_tagging')
+#TODO（）你只是简单的复制黏贴了。
+class Sequence_tagging_datareader(DatasetReader):
     def __init__(self,
                  token_indexers: Dict[str, TokenIndexer],
                  lazy: bool = True) -> None:
@@ -42,11 +41,11 @@ class Bert51_DataReader(DatasetReader):
             jsondata = json.loads(line)
             if len(jsondata['postag']) > 50:
                 continue
-            #加载{1，视图一} 这种字典
+            # 加载{1，视图一} 这种字典
             scheme_pth = Config.scheme_pth
             label_scheme_dict = scheme2index(scheme_pth)
-            
-            #读取postag，空则说明数据有问题，忽视之
+
+            # 读取postag，空则说明数据有问题，忽视之
             postag = jsondata['postag']
             if not postag:
                 continue
@@ -58,11 +57,10 @@ class Bert51_DataReader(DatasetReader):
             subject_locates = data_info['subject_locates']
             object_type = data_info['object_type']
             subject_type = data_info['subject_type']
-
+            
             labels_tensor = convert2tensor(relations, object_locates, subject_locates,
                                            object_type, subject_type, label_scheme_dict, n)
             
-        
             # replace_some_nourns将一些名词替换成其他的
             words = [ins['word'] for ins in jsondata['postag']]
             poses = [ins['pos'] for ins in jsondata['postag']]
@@ -78,16 +76,16 @@ class Bert51_DataReader(DatasetReader):
                 #     tmp_id = 1
                 # else:
                 #     tmp_id = 0
-            #
-            #     reserved_pos.append(tmp_id)
-
+                #
+                #     reserved_pos.append(tmp_id)
+                
                 # 关键的一步，将tag标签赋予Token，而且配置文件里的token_indexers参数要添加一个 pos_tag
                 tmp_token = Token(word, tag_=pos)
                 words_poses_tokens.append(tmp_token)
-
+            
             # yield self.text_to_instance(words_poses_tokens, reserved_pos, labels_tensor)
             yield self.text_to_instance(words_poses_tokens, labels_tensor)
-        
+    
     def text_to_instance(self, words_poses_tokens: List[Token],
                          # reserved_pos: List[int],
                          labels_tensor: torch.Tensor = None) -> Instance:
@@ -101,7 +99,7 @@ class Bert51_DataReader(DatasetReader):
         else:
             n = len(words_poses_field)
             labels_np = torch.zeros((n, n, 51))
-            
+        
         ner_field = ArrayField(labels_np, padding_value=-1)
         
         # ner_field=MetadataField(ner_labels)

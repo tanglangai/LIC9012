@@ -4,12 +4,14 @@
     //////////////////////////////////////////////////////////
 //    "train_data_path":      "/home/liangjx/K40extract_info/data/origin_data/train_data.json",
 //    "validation_data_path": "/home/liangjx/K40extract_info/data/origin_data/dev_data.json",
-    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
-    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/faketrain.json",
+//    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/fk_onlyone.json",
+//    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/fk_onlyone.json",
+        "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/fk_trn.json",
+//    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/fk_trn.json",
     //////////////////////////////////////////////////////////
     "dataset_reader": {
-        "type": "bert_51",
-        "lazy": true,
+        "type": "decoder_datareader",
+        "lazy": false,
         "token_indexers": {
             "words_poses_field": {
                 "type": "single_id"
@@ -23,8 +25,11 @@
 
     //////////////////////////////////////////////////////////
     "model": {
-        "type": "seq2seq_attention",
-
+        "type": "decoder_multi_model",
+//        "initializer": [
+//           [".*embed.*", {"type": "xavier_uniform"}]
+//
+//     ],
         "text_field_embedder": {
             "allow_unmatched_keys": true,
 //            "embedder_to_indexer_map": {
@@ -34,7 +39,7 @@
             "token_embedders": {
                 "words_poses_field": {
                     "type": "embedding",
-                    "embedding_dim": 100,
+                    "embedding_dim": 300,
 //                    "pretrained_file": "/home/liangjx/teamextraction/data/original_data/sgns.baidubaike.bigram-char",
                     "trainable": true
                 },
@@ -47,63 +52,84 @@
 //                    "vocab_namespace": "",
                     "type": "character_encoding",
                     "embedding": {
-                        "embedding_dim": 50
+                        "embedding_dim": 100
                     },
                     "encoder":{
                         "type": "lstm",
-                        "input_size": 50,
-                        "hidden_size": 50
+                        "input_size": 100,
+                        "hidden_size": 100
                     }
                 }
             }
         },
-//
-//        "seq2seq_encoder": {
-//            "type": "intra_sentence_attention",
-//            "input_dim": 420,
-//            "output_dim": 100,
-//
-//            "combination": "1,2"
-//
-//        },
 
         "seq2seq_encoder": {
-            "type": "gated-cnn-encoder",
-            "input_dim": 170,
-            "layers": [ [[4, 170]], [[4, 170], [4, 170]], [[4, 170], [4, 170]]]
-        },
+            "type": "lstm",
+            "input_size": 420,
+            "hidden_size": 210,
+            "bidirectional": true
 
-        "matrix_attention": {
-            "type": "bilinear",
-            "matrix_1_dim": 340,
-            "matrix_2_dim": 340,
-            "label_dim": 51,
-            "use_input_biases": true,
-            "activation": null
+        },
+        "sentence_encoder": {
+            "type": "lstm",
+            "input_size": 420,
+            "hidden_size": 210,
+            "bidirectional": true
+        },
+//        "seq2seq_encoder": {
+//            "type": "gated-cnn-encoder",
+//            "input_dim": 170,
+//            "layers": [ [[4, 170]], [[4, 170], [4, 170]], [[4, 170], [4, 170]]]
+//        },
+
+        "linear_layer":{
+            "input_dim": 1260,
+            "num_layers": 2,
+            "hidden_dims": [420, 51],
+            "activations": ["relu", "linear"],
+            "dropout": [0.1, 0]
         }
+//        "matrix_attention": {
+//            "type": "bilinear",
+//            "matrix_1_dim": 840,
+//            "matrix_2_dim": 840,
+//            "label_dim": 51,
+//            "use_input_biases": true,
+//            "activation": null
+//        }
     },
 
     //////////////////////////////////////////////////////////
     "iterator": {
         "type": "bucket",
-        "batch_size": 64 ,
+        "batch_size": 128 ,
         "sorting_keys": [["words_poses_field", "num_tokens"]]
     },
     //////////////////////////////////////////////////////////
     "trainer": {
+        "should_log_learning_rate":true,
         "num_epochs": 100,
-        "cuda_device": [0,1],
+//        "cuda_device": [0,1],
+        "cuda_device": 0,
 //        "cuda_device": -1,
         "optimizer": {
             "type": "adam",
-            "lr": 1e-2
+            "lr": 5e-3
         },
          "num_serialized_models_to_keep":2,
+        "grad_norm": 5.0,
 
          "learning_rate_scheduler":{
           "type": "exponential",
           "gamma":  0.9
         },
+
+//        "learning_rate_scheduler":  {
+//          "type": "reduce_on_plateau",
+//          "factor": 0.5,
+//          "mode": "max",
+//          "patience": 10
+//    },
         "patience": 50
     }
 }

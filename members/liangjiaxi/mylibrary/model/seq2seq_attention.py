@@ -2,7 +2,7 @@
 梁家熙
 
 embedding + seq2seq + matrix attention 解码
-
+事实证明，里面有很多无关的向量，实际上是可以去除的。
 """
 
 from typing import Iterator, List, Dict, Optional

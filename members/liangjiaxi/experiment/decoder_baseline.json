@@ -1,0 +1,114 @@
+// embedding + seq2seq +matrix_attention 结构
+
+{
+    //////////////////////////////////////////////////////////
+//    "train_data_path":      "/home/liangjx/K40extract_info/data/origin_data/train_data.json",
+//    "validation_data_path": "/home/liangjx/K40extract_info/data/origin_data/dev_data.json",
+    "train_data_path":      "/home/liangjx/teamextraction/data/processed_data/fk_trn.json",
+    "validation_data_path": "/home/liangjx/teamextraction/data/processed_data/fk_vln.json",
+    //////////////////////////////////////////////////////////
+    "dataset_reader": {
+        "type": "decoder_datareader",
+        "lazy": true,
+        "token_indexers": {
+            "words_poses_field": {
+                "type": "single_id"
+            },
+            "token_characters": {
+                "type": "characters"
+            },
+            "poses": { "type": "pos_tag" }
+        }
+    },
+
+    //////////////////////////////////////////////////////////
+    "model": {
+        "type": "decoder_model",
+
+        "text_field_embedder": {
+            "allow_unmatched_keys": true,
+//            "embedder_to_indexer_map": {
+//            "words_poses_field": ["words_poses_field", "words_poses_field-offsets"],
+//            "poses": ["poses"]
+//            },
+            "token_embedders": {
+                "words_poses_field": {
+                    "type": "embedding",
+                    "embedding_dim": 300,
+                    "pretrained_file": "/home/liangjx/teamextraction/data/original_data/sgns.baidubaike.bigram-char",
+                    "trainable": true
+                },
+                "poses": {
+                    "vocab_namespace": "pos_tokens",
+                    "type": "embedding",
+                    "embedding_dim": 20
+                },
+                "token_characters": {
+//                    "vocab_namespace": "",
+                    "type": "character_encoding",
+                    "embedding": {
+                        "embedding_dim": 100
+                    },
+                    "encoder":{
+                        "type": "lstm",
+                        "input_size": 100,
+                        "hidden_size": 100
+                    }
+                }
+            }
+        },
+
+        "seq2seq_encoder": {
+            "type": "intra_sentence_attention",
+            "input_dim": 420,
+            "output_dim": 420,
+
+            "combination": "1,2"
+
+        },
+        "sentence_encoder": {
+            "type": "lstm",
+            "input_size": 420,
+            "hidden_size": 210,
+            "bidirectional": true
+        },
+//        "seq2seq_encoder": {
+//            "type": "gated-cnn-encoder",
+//            "input_dim": 170,
+//            "layers": [ [[4, 170]], [[4, 170], [4, 170]], [[4, 170], [4, 170]]]
+//        },
+
+        "matrix_attention": {
+            "type": "bilinear",
+            "matrix_1_dim": 840,
+            "matrix_2_dim": 840,
+            "label_dim": 51,
+            "use_input_biases": true,
+            "activation": null
+        }
+    },
+
+    //////////////////////////////////////////////////////////
+    "iterator": {
+        "type": "bucket",
+        "batch_size": 64 ,
+        "sorting_keys": [["words_poses_field", "num_tokens"]]
+    },
+    //////////////////////////////////////////////////////////
+    "trainer": {
+        "num_epochs": 100,
+//        "cuda_device": [0,1],
+        "cuda_device": -1,
+        "optimizer": {
+            "type": "adam",
+            "lr": 1e-2
+        },
+         "num_serialized_models_to_keep":2,
+
+         "learning_rate_scheduler":{
+          "type": "exponential",
+          "gamma":  0.9
+        },
+        "patience": 50
+    }
+}
