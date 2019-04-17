@@ -87,7 +87,7 @@ def scheme2index(pth: str) -> Dict[str, int]:
             # predicate = data['predicate']
             # object_type = data['object_type']
             # subject_type = data['subject_type']
-            t_key = data['predicate'] + data['object_type'] + data['subject_type']
+            t_key = data['predicate'] +"-"+  data['subject_type'] +"-"+ data['object_type']
             index_dict[t_key] = i
             i += 1
             
