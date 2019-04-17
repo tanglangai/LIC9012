@@ -25,13 +25,35 @@ class EvaluatePrediction(object):
         """
         golden_file = open(golden_file_pth)
         predict_file = open(predict_file_pth)
-        
+        i = 0
         while True:
+            i += 1
+            
+            if i%100 ==0:
+                print("i is {}".format(i))
+                print(self.right_num_spo)
+                print(self.all_predict_num_spo)
+                print(self.should_have_num_spo)
+                
             golden_line = golden_file.readline()
             predict_line = predict_file.readline()
             
-            if len(golden_line) == 0 or len(predict_line) == 0:
+            if (len(golden_line) == 0) or (len(predict_line) == 0):
                 break
+
+            golden_spo_text = demjson.decode(golden_line)['text']
+            predict_spo_text = demjson.decode(predict_line)['text']
+            j = 0
+            
+            # 如果预测的时候跳过了噪音行，那么这里就要进行对其处理
+            while golden_spo_text != predict_spo_text:
+                golden_line = golden_file.readline()
+                golden_spo_text = demjson.decode(golden_line)['text']
+                j += 1
+                if j>200:
+                    raise Exception('没有找到答案')
+                if (len(golden_line) == 0) or (len(predict_line) == 0):
+                    break
             
             golden_spo_list = demjson.decode(golden_line)['spo_list']
             predict_spo_list = demjson.decode(predict_line)['spo_list']
@@ -59,6 +81,7 @@ class EvaluatePrediction(object):
         """
             对比两个列表，判断预测正确数目，所有检测的数目，应包含数目
         """
+        assert len(golden_spo_list) != 0 and len(predict_spo_list) != 0
         all_predict_num_spo = len(predict_spo_list)
         should_have_num_spo = len(golden_spo_list)
         right_num_spo = 0
@@ -77,8 +100,8 @@ class EvaluatePrediction(object):
                     right_num_spo += 1
                     
         return right_num_spo, all_predict_num_spo, should_have_num_spo
-                
+        
     
 if __name__ == '__main__':
     a = EvaluatePrediction()
-    a.evluate('./predict.json','./golden.json')
+    a.evluate('./dev_data_4_17.json','../data/origin_data/dev_data.json')
