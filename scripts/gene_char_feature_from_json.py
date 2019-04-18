@@ -51,6 +51,7 @@ def output_char_feature_data(data_dir, pyltp_path, output_dir = './processed_dat
             for dct in data:
                 json.dump(dct, f)
                 f.write('\n')
+    pipeline.release_pyltp_model()
 
     return None
 
